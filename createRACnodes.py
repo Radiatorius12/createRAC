@@ -12,7 +12,7 @@
 			-o- (for use with oracle's deploycluster.py script)
 				Include params.ini (for use with oracle's deploycluster.py script)
 				include updating / preparing a params.ini
-				inclupe -P params.ini in call to deploycluster line
+				include -P params.ini in call to deploycluster line
 
 		SHOULD:
 			-o- private IPs AND ? OR change NIC setting in template so that the private NIC is local host only
@@ -37,7 +37,7 @@
 	}
 
 
-	Working Version Jun 27 20:50 - TonyA
+	Working Version Mon Jul  2 15:00:23 +04 2018 - TonyA
 
 '''
 
@@ -50,6 +50,12 @@ from shutil import copyfile
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import datetime
+
+import getpass
+try:
+	import passwdPkg
+except Exception as e:
+	print "Warning: could not load passwdPkg : {}".format(e)
 
 try:
 	import ipAddressPkg
@@ -84,10 +90,11 @@ class StateFile:
 	def purgeOld(self):
 		for f in self.oldStateFiles:
 			try:
-				print "rm {}".format(f)
+				#print "rm {}".format(f)
 				os.remove(f)
 			except OSError as e:
-				print "Warning: failed to delete {} : {}".format(f,str(e))
+				#print "Warning: failed to delete {} : {}".format(f,str(e))
+				pass
 
 	def printStateFile(self):
 		print self.stateFileName
@@ -163,6 +170,7 @@ def wait_for_job(s,joburi):
 				break
 
 def renameVm(s,baseUri,vmId,vmNewName):
+	# deprecated:  use changeVm(s,baseUri,vmId,"name",value) instead 
 	print "renameVm called"
 	uri='{base}/Vm/{vmId}'.format(base=baseUri,vmId=vmId);
 	obj=s.get(uri).json()
@@ -200,6 +208,76 @@ def renameVm(s,baseUri,vmId,vmNewName):
 #  end of renameVm() ------------------------------
 
 
+def changeVm(s,baseUri,vmId,attribute,value):
+	'''
+		Attributes that can be changed:
+	'''
+	supportedVmAttributeChanges = [
+			"name"
+			,"description"
+			,"cpuCount"
+			,"cpuCountLimit"
+			,"cpuPriority"
+			,"cpuUtilizationCap"
+			,"highAvailability"
+			,"hugePagesEnabled"
+			,"keymapName"
+			,"memory"
+			,"memoryLimit"
+			,"networkInstallPath"
+			,"osType"
+			,"vmMouseType"
+			,"vmStartPolicy"
+			,"restartActionOnCrash"
+	]
+
+	# check that attribute is in supportedVmAttributeChanges
+	try:
+		i = supportedVmAttributeChanges.index(attribute)
+	except ValueError as e:
+		print "ERROR: changeVm attribute {} is not supported ".format(attribute)
+
+	print "changeVm {} {} called".format(attribute,value)
+	uri='{base}/Vm/{vmId}'.format(base=baseUri,vmId=vmId);
+	vmObj=s.get(uri).json()
+
+	debug.prt ( "VM Before change"                                               )
+	debug.prt ( "==============================================================" )
+	debug.prt ( json.dumps(vmObj, indent=2)                  )
+	debug.prt ( "==============================================================" )
+
+	# rename in the json vmObject
+	if attribute == "name":
+		vmObj['id']['name']=value
+		vmObj['name']=value
+	else:
+		vmObj[attribute]=value
+
+	debug.prt ( "VM block changed to"                                               )
+	debug.prt ( "==============================================================" )
+	debug.prt ( json.dumps(vmObj, indent=2)                  )
+	debug.prt ( "==============================================================" )
+
+	r=s.put(uri,data=json.dumps(vmObj))
+	job=r.json()
+
+	if "errorCode" not in job:
+		jobResult=wait_for_job(s,job['id']['uri'])
+		if jobResult['jobSummaryState'] == 'SUCCESS':
+			print
+			print "Change successful"
+	else:
+		raise Exception('Submit Job failed: {error}'.format( error=json.dumps( job, indent=2 )))
+
+	vmObj=s.get(uri).json()
+	debug.prt ( "VM After change"                                        )
+	debug.prt ( "==============================================================" )
+	debug.prt ( json.dumps(vmObj, indent=2)                  )
+	debug.prt ( "==============================================================" )
+
+#  end of changeVm() ------------------------------
+
+
 def cloneVm(s,baseUri,templateVm,vmName):
 	# Usage: cloneVm(s,baseUri,'OVM_OL7U5_X86_64_12102DBRAC_PVHVM-1of2.tar.gz' ,'racnode.0')
 	repo_id     = myConfig['repositoryId']
@@ -234,7 +312,8 @@ def cloneVm(s,baseUri,templateVm,vmName):
 		print "Renaming to {}".format(vmName)
 		print "=============================================================="
 		print
-		renameVm(s,baseUri,clonedVmId,vmName)
+		#renameVm(s,baseUri,clonedVmId,vmName)
+		changeVm(s,baseUri,clonedVmId,"name",vmName)
 		#return clonedVmId
 		return get_obj_from_id(s,baseUri,'Vm',clonedVmId)
 	else:
@@ -538,16 +617,16 @@ def createDeployclusterConfigFile(deployclusterNetConfigFile):
 		iniFile.write("NODE{}={}\n".format(       nodeNum,racnode["name"]   ))
 		iniFile.write("NODE{}IP={}\n".format(     nodeNum,racnode["public ip"]     ))
 		if racnode.get("priv") is not None:
-			iniFile.write("NODE{}PRIV={}\n".format(   nodeNum, v   ))
+			iniFile.write("NODE{}PRIV={}\n".format(   nodeNum, racnode.get("priv")   ))
 
 		if racnode.get("privip") is not None:
-			iniFile.write("NODE{}PRIVIP={}\n".format(   nodeNum, v   ))
+			iniFile.write("NODE{}PRIVIP={}\n".format(   nodeNum, racnode.get("privip")   ))
 
 		if racnode.get("vip") is not None:
-			iniFile.write("NODE{}VIP={}\n".format(   nodeNum, v   ))
+			iniFile.write("NODE{}VIP={}\n".format(   nodeNum, racnode.get("vip")   ))
 
 		if racnode.get("vipip") is not None:
-			iniFile.write("NODE{}VIPIP={}\n".format(   nodeNum, v   ))
+			iniFile.write("NODE{}VIPIP={}\n".format(   nodeNum, racnode.get("vipip")  ))
 		
 	for key in myConfig["racCommonData"]:
 		iniFile.write("{}={}\n".format(key,myConfig["racCommonData"][key]))
@@ -558,19 +637,6 @@ def createDeployclusterConfigFile(deployclusterNetConfigFile):
 
 	iniFile.close()
 #  end of createDeployclusterConfigFile() ------------------------------
-
-
-'''
-def stateFile():
-	stateFile = os.path.splitext(args.configFile)[0] + '.state.json'
-	if os.path.isfile(stateFile):
-		now=datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-		stateFileOld="{}.{}".format(stateFile, now)
-		copyfile(stateFile, stateFileOld)
-	with open(stateFile,'w') as f:
-		json.dump(myConfig, f, indent=2)
-'''
-
 
 def createNodes(s,baseUri):
 	# ------------------------------------------------------------------------------
@@ -604,7 +670,17 @@ def createNodes(s,baseUri):
 		# clone VM
 		racnode['obj']=cloneVm(s, baseUri, myConfig['templateName'], racnode['name'])
 		conf.save(myConfig)
-
+		# update VM if it has nodeConfig
+		if racnode.get("nodeConfig") is not None:
+			nodeConfig = racnode.get("nodeConfig")
+			for attribute in nodeConfig:
+				value = nodeConfig[attribute]
+				print "Setting {} => {}".format(attribute,value)
+				try:
+					vmId=racnode["obj"]["id"]["value"]
+					changeVm(s,baseUri,vmId,attribute,value)	
+				except Exception as e:
+					print "WARNING:  failed : {}".format(e)
 	debug.prt ( "Node Config:" )
 	debug.prt ( json.dumps(myConfig['racnodes'], indent=2) )
 
@@ -931,15 +1007,19 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description="Create n RAC nodes, single instance VM, their shared disks and mapping to all nodes")
 	parser.add_argument("-v", "--verbose", action="store_true")
-	parser.add_argument("-configFile", "-c",      help="configuration of the build in json format", required=True)
-	parser.add_argument("-paramsFile", "-p",      help="deploycluster params.ini file only used for info at the moment",           required=True)
+	parser.add_argument("-configFile", "-c", help="configuration of the build in json format", required=True)
+	parser.add_argument("-paramsFile", "-p", help="deploycluster params.ini file only used for info at the moment", default="params.ini")
 	parser.add_argument("-singleInstanceHA", "-single","-s", help="config deploycluster network ini file for Single instace HA",  action="store_true")
 
 	group_ex = parser.add_mutually_exclusive_group(required=True)
 	group_ex.add_argument("-apply",         help="Create RAC nodes",                                     action="store_true")
 	group_ex.add_argument("-plan",          help="NOT YET IMPLEMENTED - but to be like terraform plan",  action="store_true")
 	group_ex.add_argument("-destroy",       help="destroy VMs)",                                         action="store_true")
-	parser.add_argument("-keepIPs",  "-k",  help="used with -destroy to retain the VM IPs",              action="store_true")
+
+	group_ex2 = parser.add_mutually_exclusive_group()
+	group_ex2.add_argument("-keepIPs",  help="used with -destroy to retain the VM IPs",           action="store_true", default=True)
+	group_ex2.add_argument("-dropIPs",  help="used with -destroy to drop / release the VM IPs",   action="store_true")
+
 
 	args = parser.parse_args()
 
@@ -975,9 +1055,12 @@ if __name__ == '__main__':
 		with open(conf.getName(), "r") as f:
 			myConfig = json.load(f)
 
+	except ValueError as error:
+		print("Config file {} is not valid JSON".format(conf.getName()))
+		exit(1)	
 	except Exception as error:
 		print("Failed to load RAC Config from file {} error-> {}".format(conf.getName(), error))
-		exit()
+		exit(1)
 
 	conf.save(myConfig)
 
@@ -986,9 +1069,22 @@ if __name__ == '__main__':
 	  Create a Session for OVM connections
 	 ---------------------------------------
 	'''
+	ovm_pw = None
+	if myConfig.get("ovm_pw") is not None:
+		ovm_pw = myConfig.get("ovm_pw")
+	else:
+		ovm_vault_name = myConfig.get("ovm_vault_name")
+		if ovm_vault_name is not None:
+			try:
+				ovm_pw=passwdPkg.getOVMPasswd(ovm_vault_name,'admin')
+			except Exception as e:
+				print e
+				exit(1)
+		if ovm_pw is None:
+			ovm_pw = getpass.getpass("OVM admin password: ")
 
 	s=requests.Session()
-	s.auth=( myConfig['ovm_user'], myConfig['ovm_pw'] )
+	s.auth=( myConfig['ovm_user'], ovm_pw )
 	s.verify=False #disables SSL certificate verification
 	s.headers.update({'Accept': 'application/json', 'Content-Type': 'application/json'})
 
@@ -1066,7 +1162,7 @@ if __name__ == '__main__':
 		print "python {py} --insecure -u {user} -p {pw} -H {host} -N {ini} -M {nodeList} -P {params} ".format(
 																								py=deploycluster
 																								,user=myConfig['ovm_user']
-																								,pw=myConfig['ovm_pw']
+																								,pw=ovm_pw
 																								,host=myConfig["ovmHost"]
 																								,ini=deployclusterNetConfigFile
 																								,nodeList=myConfig["nodeList"]
@@ -1077,7 +1173,7 @@ if __name__ == '__main__':
 		print
 
 		
-		conf.showStateFiles()
+		#conf.showStateFiles()
 		conf.purgeOld()
 		
 		exit(0)
@@ -1109,16 +1205,14 @@ if __name__ == '__main__':
 		print ( "calling deleteDisks()..." )
 		deleteDisks(s,baseUri,diskToBeDeletedMap)
 
-
-		if not args.keepIPs:
+		if args.dropIPs or not args.keepIPs:
 			print ("calling releaseIPAddresses()...")
 			releaseIPAddresses()
 
-		if not args.skipNodeCreation:
-			print ( "calling deleteNodes()..." )
+		print ( "calling deleteNodes()..." )
 		deleteNodes()
 		
-		conf.showStateFiles()
+		#conf.showStateFiles()
 		conf.purgeOld()
 		
 		
