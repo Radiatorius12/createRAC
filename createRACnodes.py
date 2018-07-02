@@ -170,6 +170,7 @@ def wait_for_job(s,joburi):
 				break
 
 def renameVm(s,baseUri,vmId,vmNewName):
+	# deprecated:  use changeVm(s,baseUri,vmId,"name",value) instead 
 	print "renameVm called"
 	uri='{base}/Vm/{vmId}'.format(base=baseUri,vmId=vmId);
 	obj=s.get(uri).json()
