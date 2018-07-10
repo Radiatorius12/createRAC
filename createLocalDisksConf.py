@@ -6,11 +6,10 @@ Updates localDisks tuple of the createRACnodes.py config file
 Example:
 
 [automate@lvmjenkinsu createRAC]$ cat defaultLocalDisks
-DBSCRIPTS_DISK,5,Yes,for /dbscripts
-DBSCRIPTS_DISK,5,Yes,for /orachk
-OPROEM001_DISK,5,Yes,for /oproem001
-OSWATCHER_DISK,5,Yes,for /oswatcher
-ORACHK_DISK,5,Yes,for /orachk
+DBSCRIPTS_DISK,5,Yes,local disk for /dbscripts,null
+ORACHK_DISK,5,Yes,local disk for /orachk,null
+OPROEM001_DISK,5,Yes,local disk for /oproem001,null
+OSWATCHER_DISK,5,Yes,local disk for /oswatcher,null
 
 Example Usage:
 [automate@lvmjenkinsu createRAC]$ ./createLocalDisksJsonConf.py -f defaultLocalDisks  -c createRacDEMO.json
@@ -36,7 +35,7 @@ with open(args.localDisks) as f:
     lines = f.read().splitlines()
 
 localDisksJson=[]
-fields=[ "name", "size", "sparse", "description" ]
+fields=[ "name", "size", "sparse", "description", "repository"]
 for line in lines:
 	if len(line) < 1:
 		continue		
@@ -73,12 +72,15 @@ except Exception as error:
 	print("Failed to load RAC Config from file {} error-> {}".format(conf.getName(), error))
 	exit(1)
 
-conf.save(myConfig)
 
 for racnode in myConfig["racnodes"]:
 	racnode["localDisks"]=localDisksJson
-
 conf.save(myConfig)
+
+asmDisks = myConfig["asmDisks"]
+if asmDisks is not None:
+	print "Warning:  asmDisks is already set.   Consider running createAsmDisksConf.py once more and check the ALL_DISKS suggestion"
+
 
 
 
