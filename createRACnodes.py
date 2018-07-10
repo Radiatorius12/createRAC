@@ -36,9 +36,7 @@
 			,"obj":         null
 	}
 
-
-	Working Version Mon Jul  2 15:00:23 +04 2018 - TonyA
-
+	Working version from 6th Jul 2018
 '''
 
 import requests
@@ -170,7 +168,7 @@ def wait_for_job(s,joburi):
 				break
 
 def renameVm(s,baseUri,vmId,vmNewName):
-	# deprecated:  use changeVm(s,baseUri,vmId,"name",value) instead 
+	# deprecated:  use changeVm(s,baseUri,vmId,"name",value) instead
 	print "renameVm called"
 	uri='{base}/Vm/{vmId}'.format(base=baseUri,vmId=vmId);
 	obj=s.get(uri).json()
@@ -392,6 +390,7 @@ def createVmDisk(s,baseUri,asmDisk):
 		print "Physical Disk specified, so ensuring its sharable".format(name=asmDisk["name"])
 		print "setPhysicalDiskSharable is not working... if shared disks are not sharable you will get an error later...."
 		#setPhysicalDiskSharable(s,baseUri,asmDisk)
+		# NEED TO RETURN STORAGLE ELEMENT HERE ?????
 		return
 
 	# where to create disk:
@@ -401,7 +400,7 @@ def createVmDisk(s,baseUri,asmDisk):
 	repositoryId    = None
 	diskConfigRepositoryName = asmDisk.get("repository")
 
-	if diskConfigRepositoryName is None:
+	if diskConfigRepositoryName is None or diskConfigRepositoryName == "":
 		# Use global / default repo
 		repositoryId    = myConfig['repositoryId']
 		repositoryIdObj = myConfig['repositoryIdObj']
@@ -435,14 +434,14 @@ def createVmDisk(s,baseUri,asmDisk):
 		   "path": None,
 		   "resourceGroupIds": None,
 		   "mountedPath": None,
-		   "size": asmDisk['size'] * 1024 * 1024 * 1024,
+		   "size": int(asmDisk['size']) * 1024 * 1024 * 1024,
 		   "assemblyVirtualDiskId": None,
 		   "id": None,
 		   "repositoryId": repositoryIdObj,
 		   "name": asmDisk['name']
 		 }
 
-	debug.prt ( "uri + element: createVmDisk "                                   )
+	debug.prt ( "createVmDisk uri + data:"                                       )
 	debug.prt ( "==============================================================" )
 	debug.prt ( uri                                                              )
 	debug.prt ( json.dumps(obj, indent=2)                                        )
@@ -491,7 +490,7 @@ def getDiskObjByWwid(s,baseUri,diskWwid):
 #  end of getDiskObjByWwid() ------------------------------
 
 
-def createVmDiskMapping(s,baseUri,racNodeObj,asmDisks):
+def createVmDiskMapping(s,baseUri,racNode,asmDisks):
 	# ------------------------------------------------------------------------------
 	#
 	#			create VmDiskMapping
@@ -501,24 +500,32 @@ def createVmDiskMapping(s,baseUri,racNodeObj,asmDisks):
 	# racNodeObj is the json node object - the whole definition
 	# asmDisks is the list of disks
 
-	racNodeName = racNodeObj['name']
+	# Update node's config in state file
+	racNodeName = racNode['name']
+	racNodeObj=get_obj_from_name(s,baseUri,"Vm",racNodeName)
+	conf.save(myConfig)
+
+	racNodeId  = racNodeObj['id']['value']
 
 	print "=============================================================="
-	print "createVmDiskMapping called to map disks for {vm} ".format(vm=racNodeName)
+	print "createVmDiskMapping called to map disks for {vm} {id}".format(vm=racNodeName,id=racNodeId)
 	print "=============================================================="
+
 
 	# get current disk mappings
 	vmDiskMappingIds = racNodeObj['vmDiskMappingIds']
 	diskTarget = len(vmDiskMappingIds) - 1
-	racNodeId  = racNodeObj['id']['value']
 
 	asmDiskObj  = None
 	asmDiskName = None
 	for asmDisk in asmDisks:
+		print
+		print "createVmDiskMapping mapping disk {}".format(asmDisk["name"])
+		print "------------------------------------------------------------"
 		#
 		# if disk creation was skipped or the disks are Physical, asmDisk["obj"] will be null
 		#
-		if not asmDisk["obj"] or asmDisk["diskType"] == "PHYSICAL_DISK":
+		if asmDisk.get("obj") is None or asmDisk["diskType"] == "PHYSICAL_DISK":
 			# get the disk obj
 			if asmDisk["diskType"].upper() == "PHYSICAL_DISK":
 				diskWwid = asmDisk["wwid"]
@@ -582,6 +589,8 @@ def createVmDiskMapping(s,baseUri,racNodeObj,asmDisks):
 			if jobResult['jobSummaryState'] == 'SUCCESS':
 				print
 				print "{disk} Mapping Created".format(disk=jobResult['id']['name'])
+				racNodeObj=get_obj_from_name(s,baseUri,"Vm",racNodeName)
+				conf.save(myConfig)
 			else:
 				print ( "JOB Failed:"                                                    )
 				print ( "==============================================================" )
@@ -627,13 +636,13 @@ def createDeployclusterConfigFile(deployclusterNetConfigFile):
 
 		if racnode.get("vipip") is not None:
 			iniFile.write("NODE{}VIPIP={}\n".format(   nodeNum, racnode.get("vipip")  ))
-		
+
 	for key in myConfig["racCommonData"]:
 		iniFile.write("{}={}\n".format(key,myConfig["racCommonData"][key]))
-	
+
 	if args.singleInstanceHA:
 		iniFile.write("CLONE_SINGLEINSTANCE_HA=yes")
-		
+
 
 	iniFile.close()
 #  end of createDeployclusterConfigFile() ------------------------------
@@ -645,13 +654,17 @@ def createNodes(s,baseUri):
 	#
 	# ------------------------------------------------------------------------------
 	#
-	
+
 	if myConfig["racCommonData"].get("SCANIP") is not None:
 		print "Checking IP address setting for SCANIP in config {}".format(args.configFile)
 		if myConfig["racCommonData"]["SCANIP"] == "getIpAddress":
 			print "\"getIpAddress\" is set\nBooking IP address"
-			ip=ipAddressPkg.bookIP("For {racnodes} {ipType}".format(racnodes=myConfig["nodeList"], ipType="SCAN IP"))
-			myConfig["racCommonData"]["SCANIP"]=ip
+			try:
+				ip=ipAddressPkg.bookIP("For {racnodes} {ipType}".format(racnodes=myConfig["nodeList"], ipType="SCAN IP"))
+				myConfig["racCommonData"]["SCANIP"]=ip
+			except Exception as e:
+				print "ipAddressPkg.bookIP FAILED: {}".format(e)
+				exit(1)
 
 		print "SCAN ip => " + myConfig["racCommonData"]["SCANIP"]
 
@@ -661,9 +674,13 @@ def createNodes(s,baseUri):
 				print "Checking IP address setting for {} in config {}".format(ipType, args.configFile)
 				if racnode[ipType] == "getIpAddress":
 					print "\"getIpAddress\" is set\nBooking IP address"
-					ip=ipAddressPkg.bookIP("For {racnode} {ipType}".format(racnode=racnode["name"], ipType=ipType))
-					racnode[ipType]=ip
-					print ip
+					try:
+						ip=ipAddressPkg.bookIP("For {racnode} {ipType}".format(racnode=racnode["name"], ipType=ipType))
+						racnode[ipType]=ip
+						print ip
+					except Exception as e:
+						print "ipAddressPkg.bookIP FAILED: {}".format(e)
+						exit(1)
 				else:
 					print "{} => {} ".format(ipType, racnode[ipType])
 
@@ -678,7 +695,7 @@ def createNodes(s,baseUri):
 				print "Setting {} => {}".format(attribute,value)
 				try:
 					vmId=racnode["obj"]["id"]["value"]
-					changeVm(s,baseUri,vmId,attribute,value)	
+					changeVm(s,baseUri,vmId,attribute,value)
 				except Exception as e:
 					print "WARNING:  failed : {}".format(e)
 	debug.prt ( "Node Config:" )
@@ -686,64 +703,110 @@ def createNodes(s,baseUri):
 
 #  end of createNodes() ------------------------------
 
-def createDisks(s,baseUri):
+# def createDisks(s,baseUri):
+# 	print "\n\n\nDO NOT USE createDisks() - use createDisksAndMapping instead!!!!\n\n\n"
+# 	#
+# 	# ------------------------------------------------------------------------------
+# 	#
+# 	#			create VirtualDisks
+# 	#
+# 	# ------------------------------------------------------------------------------
+# 	#
+# 	for racnode in myConfig['racnodes']:
+# 		if racnode.get("localDisks") is not None:
+# 			localDisks=racnode.get("localDisks")
+# 			for localDisk in localDisks:
+# 				localDisk['obj']=createVmDisk(s,baseUri,localDisk)
+# 			conf.save(myConfig)
+# 
+# 			debug.prt ( "Local Disk Config for {}:".format(racnode["name"]))
+# 			debug.prt ( json.dumps(localDisks, indent=2) )
+# 
+# 
+# 	asmDisks=myConfig.get("asmDisks")
+# 	if len(asmDisks) > 0:
+# 		for asmDisk in asmDisks:
+# 			asmDisk['obj']=createVmDisk(s,baseUri,asmDisk)
+# 		conf.save(myConfig)
+# 
+# 		debug.prt ( "ASM Disk Config:" )
+# 		debug.prt ( json.dumps(myConfig['asmDisks'], indent=2) )
+# 
+# 
+# #  end of createDisks() ------------------------------
+
+def createDisksAndMapping(s,baseUri):
 	#
 	# ------------------------------------------------------------------------------
 	#
-	#			create VirtualDisks
+	#			for each node, create local Disks and then Mapping
 	#
 	# ------------------------------------------------------------------------------
 	#
-	asmDisks=myConfig.get("asmDisks")
-	if len(asmDisks) > 0:
-		for asmDisk in asmDisks:
-			asmDisk['obj']=createVmDisk(s,baseUri,asmDisk)
-		conf.save(myConfig)
-
-		debug.prt ( "ASM Disk Config:" )
-		debug.prt ( json.dumps(myConfig['asmDisks'], indent=2) )
-
 	for racnode in myConfig['racnodes']:
+		disksToBeMapped = []
 		if racnode.get("localDisks") is not None:
 			localDisks=racnode.get("localDisks")
 			for localDisk in localDisks:
 				localDisk['obj']=createVmDisk(s,baseUri,localDisk)
+				disksToBeMapped.append(localDisk)
+			createVmDiskMapping(s,baseUri,racnode,disksToBeMapped)
 			conf.save(myConfig)
 
-			debug.prt ( "Local Disk Config for {}:".format(racnode["name"]))
-			debug.prt ( json.dumps(localDisks, indent=2) )
+	#
+	# ------------------------------------------------------------------------------
+	#
+	#		 create shared / ASM Disks and Mapp to each node
+	#
+	# ------------------------------------------------------------------------------
+	#
+	if myConfig.get("asmDisks") is not None:
+		asmDisks=myConfig.get("asmDisks")
+		disksToBeMapped = []
+		for asmDisk in asmDisks:
+			# createVmDisk will return None if asm disk is Physical createVmDiskMapping() deals with that 
+			#print json.dumps(asmDisk,indent=2)
+			asmDisk['obj']=createVmDisk(s,baseUri,asmDisk)
+			disksToBeMapped.append(asmDisk)
+			conf.save(myConfig)
+
+		for racnode in myConfig['racnodes']:
+			createVmDiskMapping(s,baseUri,racnode,disksToBeMapped)
+			conf.save(myConfig)
+
 
 #  end of createDisks() ------------------------------
 
-def createDiskMappings(s,baseUri):
-	# ------------------------------------------------------------------------------
-	#
-	#			create VmDiskMappings
-	#
-	# ------------------------------------------------------------------------------
-
-	asmDisks=myConfig.get("asmDisks")
-	if len(asmDisks) > 0:
-		for node in myConfig['racnodes']:
-			racNodeName = node['name']
-			racNodeObj = node['obj']
-			createVmDiskMapping(s,baseUri, racNodeObj, myConfig['asmDisks'])
-			# update racnode obj as the node's diskTargets will have changed
-			node["obj"]=get_obj_from_name(s,baseUri,"Vm",racNodeName)
-			conf.save(myConfig)
-
-	for racnode in myConfig['racnodes']:
-		if racnode.get("localDisks") is not None:
-			localDisks=racnode.get("localDisks")	
-			racNodeName = node['name']
-			racNodeObj = node['obj']
-			createVmDiskMapping(s,baseUri, racNodeObj, localDisks)
-
-			# update racnode obj as the node's diskTargets will have changed
-			node["obj"]=get_obj_from_name(s,baseUri,"Vm",racNodeName)
-			conf.save(myConfig)
-
-# end of createDiskMappings() ------------------------------
+#def createDiskMappings(s,baseUri):
+#	print "\n\n\nDO NOT USE createDiskMappings() - use createDisksAndMapping instead!!!!\n\n\n"
+#	# ------------------------------------------------------------------------------
+#	#
+#	#			create VmDiskMappings
+#	#
+#	# ------------------------------------------------------------------------------
+#
+#	asmDisks=myConfig.get("asmDisks")
+#	if len(asmDisks) > 0:
+#		for node in myConfig['racnodes']:
+#			racNodeName = node['name']
+#			racNodeObj = node['obj']
+#			createVmDiskMapping(s,baseUri, racNodeObj['obj'], myConfig['asmDisks'])
+#			# update racnode obj as the node's diskTargets will have changed
+#			node["obj"]=get_obj_from_name(s,baseUri,"Vm",racNodeName)
+#			conf.save(myConfig)
+#
+#	for racnode in myConfig['racnodes']:
+#		if racnode.get("localDisks") is not None:
+#			localDisks=racnode.get("localDisks")
+#			racNodeName = node['name']
+#			racNodeObj = node['obj']
+#			createVmDiskMapping(s,baseUri, racNodeObj['obj'], localDisks)
+#
+#			# update racnode obj as the node's diskTargets will have changed
+#			node["obj"]=get_obj_from_name(s,baseUri,"Vm",racNodeName)
+#			conf.save(myConfig)
+#
+## end of createDiskMappings() ------------------------------
 
 def deleteDiskMapping(s,baseUri,m):
 	print "deleteDiskMapping called"
@@ -1057,7 +1120,7 @@ if __name__ == '__main__':
 
 	except ValueError as error:
 		print("Config file {} is not valid JSON".format(conf.getName()))
-		exit(1)	
+		exit(1)
 	except Exception as error:
 		print("Failed to load RAC Config from file {} error-> {}".format(conf.getName(), error))
 		exit(1)
@@ -1078,7 +1141,7 @@ if __name__ == '__main__':
 			try:
 				ovm_pw=passwdPkg.getOVMPasswd(ovm_vault_name,'admin')
 			except Exception as e:
-				print e
+				print "\ngetOVMPasswd FAILED: {}".format(e)
 				exit(1)
 		if ovm_pw is None:
 			ovm_pw = getpass.getpass("OVM admin password: ")
@@ -1109,10 +1172,30 @@ if __name__ == '__main__':
 
 		if myConfig['repositoryId'] is None:
 			print "Getting / Setting  repository, serverPool and template IDs..."
-			myConfig['repositoryId']    = get_id_from_name(s,baseUri,'Repository', myConfig['repository'])
-			myConfig['repositoryIdObj'] = get_idObj_from_name(s,baseUri,'Repository', myConfig['repository'])
-			myConfig['serverPoolId']    = get_id_from_name(s,baseUri,'ServerPool',myConfig['serverPool'])
-			myConfig['templateNameId']  = get_id_from_name(s,baseUri,'Vm',myConfig['templateName'])
+			if myConfig.get('repositoryId') is None:
+				id = get_id_from_name(s,baseUri,'Repository', myConfig['repository'])
+				if id is None:
+					print "ERROR: could not find repositoryId {} check name and try again".format(myConfig['repository'])
+					exit(1)
+				myConfig['repositoryId'] = id
+			if myConfig.get('repositoryIdObj') is None:
+				id = get_idObj_from_name(s,baseUri,'Repository', myConfig['repository'])
+				if id is None:
+					print "ERROR: could not find repository {} check name and try again".format(myConfig['repository'])
+					exit(1)
+				myConfig['repositoryIdObj'] = id
+			if myConfig.get('serverPoolId') is None:
+				id = get_id_from_name(s,baseUri,'ServerPool',myConfig['serverPool'])
+				if id is None:
+					print "ERROR: could not find serverPool {} check name and try again".format(myConfig['serverPool'])
+					exit(1)	
+				myConfig['serverPoolId']    = id
+			if myConfig.get('templateNameId') is None:
+				id = get_id_from_name(s,baseUri,'Vm',myConfig['templateName'])
+				if id is None:
+					print "ERROR: could not find templateName {} check name and try again".format(myConfig['templateName'])
+					exit(1)	
+				myConfig['templateNameId']   = id
 
 		if args.paramsFile is not None:
 			myConfig['paramsFile']=args.paramsFile
@@ -1130,14 +1213,14 @@ if __name__ == '__main__':
 
 		debug.prt ( "myConfig" )
 		debug.prt ( json.dumps(myConfig, indent=2) )
-
 		conf.save(myConfig)
 
 		createNodes(s,baseUri)
+		conf.save(myConfig)
 
-		createDisks(s,baseUri)
-
-		createDiskMappings(s,baseUri)
+		# createDisks(s,baseUri)
+		# createDiskMappings(s,baseUri)
+		createDisksAndMapping(s,baseUri)
 
 		#
 		# Run
@@ -1149,7 +1232,7 @@ if __name__ == '__main__':
 
 		# need to integrate deploycluster.py but in the short term,....
 		deploycluster="deploycluster.py"
-		if not os.path.isfile(deploycluster) or os.environ["PYTHONPATH"] is not None:
+		if not os.path.isfile(deploycluster) and os.environ["PYTHONPATH"] is not None:
 			deploycluster=os.path.join(  os.environ["PYTHONPATH"],  "deploycluster.py" )
 		else:
 			print "Cant find deploycluster.py script"
@@ -1172,10 +1255,10 @@ if __name__ == '__main__':
 		print"===================================================================================="
 		print
 
-		
+
 		#conf.showStateFiles()
 		conf.purgeOld()
-		
+
 		exit(0)
 
 	# end of apply = True
@@ -1211,9 +1294,9 @@ if __name__ == '__main__':
 
 		print ( "calling deleteNodes()..." )
 		deleteNodes()
-		
+
 		#conf.showStateFiles()
 		conf.purgeOld()
-		
-		
+
+
 	exit(0)
