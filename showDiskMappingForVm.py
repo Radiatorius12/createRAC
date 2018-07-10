@@ -100,6 +100,7 @@ try:
 	import passwdPkg
 except Exception as e:
 	print "Warning: could not load passwdPkg : {}".format(e)
+#import createRACnodes2Jul18 as createRACnodes
 import createRACnodes
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -112,21 +113,28 @@ def getDiskTargetCount(s,baseUri,vmId):
 	diskTargetCount = len(vmDiskMappingIds)
 	return diskTargetCount
 
-
 def getDiskmappingsForVm(s,baseUri,vmId):
 
 	diskCount=getDiskTargetCount(s,baseUri,vmId)
 	print "DISK COUNT " ,diskCount
 	print "----------------"
-
-	mappings = [ None ] * diskCount
 	r=s.get(baseUri+'/VmDiskMapping').json()
+	# find max(diskTarget) because there can be "holes" in the list of targets
+	#
+	maxDiskTarget = 0
+	for mapping in r:
+		if mapping["vmId"]["value"] == vmId:
+			diskTarget=mapping["diskTarget"]
+			if diskTarget > maxDiskTarget:
+				maxDiskTarget = diskTarget
+
+	mappings = [ None ] * (maxDiskTarget + 1)
 	for mapping in r:
 		if mapping["vmId"]["value"] == vmId:
 			diskTarget=mapping["diskTarget"]
 			mappings[diskTarget]=mapping
 			#mappings.append(mapping)
-	return mappings
+	return sorted(mappings)
 
 def getPhysicalDisk(s,baseUri,id):
 	r=s.get(baseUri+'/StorageElement').json()
@@ -170,7 +178,7 @@ def deleteDiskMapping(s,baseUri,vmId,mappedObjId):
 
  ======================================================================
 '''
-parser = argparse.ArgumentParser(description="Shows Disk mapping for a Vm")
+parser = argparse.ArgumentParser(description="Shows Disk mapping for a Vm ALSO -delete to delete mappings")
 parser.add_argument("-ovmConfig","-c"  ,help="OVM json config file", required=True)
 parser.add_argument("--verbose", "-v", action="store_true")
 
@@ -199,7 +207,7 @@ if myConfig.get("ovm_pw") is None:
 		try:
 			myConfig["ovm_pw"]=passwdPkg.getOVMPasswd(ovm_vault_name,'admin')
 		except Exception as e:
-			print e
+			print "Error attempting to retrieve password from Vault: {}".format(e)
 		if myConfig.get("ovm_pw") is None:
 			myConfig["ovm_pw"] = getpass.getpass("OVM admin password: ")
 
@@ -211,7 +219,7 @@ baseUri="https://{host}:{port}{uri}".format(host=myConfig["ovmHost"],
 											 port=myConfig["port"],
 											 uri=myConfig['baseUri'])
 
-
+vmId = None
 if args.vmName is not None:
 	try:
 		vmId=createRACnodes.get_id_from_name(s,baseUri,'Vm',args.vmName)
@@ -229,11 +237,14 @@ print "-------------------------------------------------------------------------
 
 diskMappings=getDiskmappingsForVm(s,baseUri,vmId)
 for mapping in diskMappings:
+	if mapping is None:
+		#print "Empty Slot"
+		continue
 	if mapping.get("virtualDiskId"):
 		if args.verbose:
 			print "Virtual Disk: " + json.dumps(mapping["virtualDiskId"], indent=2, sort_keys=True)
 		virtDisk=getVirtalDisk(s,baseUri,mapping["virtualDiskId"]["value"])
-		print "Virtual Disk: {diskTarget} \"{ovm}\" size {size:.1f} GB shareable={shareable} description=\"{desc}\"".format(
+		print "targetId: {diskTarget:>2} Virtual Disk: \"{ovm}\" size {size:.1f} GB shareable={shareable} description=\"{desc}\"".format(
 			diskTarget=mapping["diskTarget"],
 			ovm=virtDisk["name"],
 			size=virtDisk["size"] / 1024 / 1024 / 1024,
@@ -244,11 +255,14 @@ for mapping in diskMappings:
 print "------------------------------------------------------------------------------------------------------------------------------------"
 deleteAll = False
 for mapping in diskMappings:
+	if mapping is None:
+		#print "Empty Slot"
+		continue
 	if mapping.get("storageElementId"):
 		if args.verbose:
 			print "Physical Disk:" + json.dumps(mapping["storageElementId"], indent=2, sort_keys=True)
 		phyDisk=getPhysicalDisk(s,baseUri,mapping["storageElementId"]["value"])
-		print "Physical Disk: {diskTarget} WWID : {wwid} OVM Disk: \"{ovm}\" size {size:.1f} GB shareable={shareable} description=\"{desc}\"".format(
+		print "targetId: {diskTarget:>2} Physical Disk: WWID : {wwid} OVM Disk: \"{ovm}\" size {size:.1f} GB shareable={shareable} description=\"{desc}\"".format(
 					diskTarget=mapping["diskTarget"],
 					wwid=phyDisk["page83Id"][-32:],
 					ovm=phyDisk["name"],
