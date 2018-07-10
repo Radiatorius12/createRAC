@@ -9,21 +9,16 @@ cd /home/automate/ovm/createRAC
 
 cat eximBillsUAT_OVM.json
 {
-    "ovmHost":           "10.119.9.60"
+    "ovmHost":           "x.y.z.1"
     ,"port":              7002
     ,"baseUri":           "/ovm/core/wsapi/rest"
     ,"ovm_user":          "admin"
 }
 
-./createDiskMapping.py -c UAT_OVM.json -wwid 600601600E3600CC2153EFA67AE811 -vmId 0004fb0000060000cfc71a951de69201
 ./createDiskMapping.py -c UAT_OVM.json -wwid 600601600ec03600cb545b949352e811 -vmId 0004fb00000600004ea7d13045e4d77e
 
 ./createDiskMapping.py -c UAT_OVM.json -wwid 600601600ec036005bbdbdb89352e811 -vmName racphys0
 
-
-
-Status:
-	NEED TO TEST
 
 '''
 
@@ -37,7 +32,8 @@ try:
 	import passwdPkg
 except Exception as e:
 	print "Warning: could not load passwdPkg : {}".format(e)
-import createRACnodes
+import createRACnodes2Jul18 as createRACnodes
+#import createRACnodes
 
 parser = argparse.ArgumentParser(description="Create Mapping between VM and Physical Disk (wwid)")
 parser.add_argument("-ovmConfig","-c"  ,help="OVM json config file", required=True)
@@ -93,7 +89,7 @@ baseUri="https://{host}:{port}{uri}".format(host=myConfig["ovmHost"],
 	Get StorageElement object for the Disk with WWID
 '''
 
-diskToBeMapped = []
+disksToBeMapped = []
 if args.listofWWIDs:
 	wwids = []
 	with open(args.listofWWIDs) as f:
@@ -104,11 +100,11 @@ if args.listofWWIDs:
 			continue
 		diskNo += 1
 		details=line.split(',')
-		wwid=details[0]
+		wwid=details[0].lower()
 		description=""
 		if len(details) > 1:
 			description=details[1]
-		diskToBeMapped.append({
+		disksToBeMapped.append({
 							"name":          "ASM_DISK{}".format({diskNo})
 							,"diskType":     "PHYSICAL_DISK"
 							,"size":         0
@@ -119,7 +115,7 @@ if args.listofWWIDs:
 							,"wwid":         wwid
 					})
 else:
-	diskToBeMapped = [ {
+	disksToBeMapped = [ {
 								"name":          "ASM_DISK1"
 								,"diskType":     "PHYSICAL_DISK"
 								,"size":         0
@@ -127,13 +123,13 @@ else:
 								,"sparse":       "No"
 								,"description":  ""
 								,"obj":          None
-								,"wwid":         args.wwid
+								,"wwid":         args.wwid.lower()
 						} ]
 
 
 debug.prt ( "Disk Object:"                                                   )
 debug.prt ( "==============================================================" )
-debug.prt ( ( json.dumps(diskToBeMapped, indent=2) )                                )
+debug.prt ( ( json.dumps(disksToBeMapped, indent=2) )                                )
 debug.prt ( "==============================================================" )
 
 '''
@@ -150,7 +146,7 @@ debug.prt ( "==============================================================" )
 debug.prt ( ( json.dumps(racNodeObj, indent=2) )                             )
 debug.prt ( "==============================================================" )
 
-createRACnodes.createVmDiskMapping(s,baseUri,racNodeObj,diskToBeMapped)
+createRACnodes.createVmDiskMapping(s,baseUri,racNodeObj,disksToBeMapped)
 
 
 
