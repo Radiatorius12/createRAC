@@ -39,16 +39,16 @@ lines = []
 with open(args.asmDisks) as f:
     lines = f.read().splitlines()
 
-asmDiskNo=0
+noOfAsmDisks=0
 asmDisksJson=[]
 fields=[ "wwid", "description" ]
 for line in lines:
 	if len(line) < 1:
 		continue
-	asmDiskNo += 1
+	noOfAsmDisks += 1
 
 	disk = { "diskType": "PHYSICAL_DISK", "shareable":  True, "sparse": "No"}
-	disk[ "name" ] = "ASM_DISK{}".format(asmDiskNo)
+	disk[ "name" ] = "ASM_DISK{}".format(noOfAsmDisks)
 	i = 0
 	for f in line.split(','):
 		#print fields[i], f
@@ -58,15 +58,6 @@ for line in lines:
 
 if args.verbose:
 	print json.dumps(asmDisksJson,indent=2)
-
-print "You may want to update ALLDISKS in params.ini to this: "
-
-ALLDISKS="ALLDISKS="
-# print from /dev/xvdc ... 
-for dn in [ chr(i + 98) for i in range(1,asmDiskNo + 1) ]:
-	ALLDISKS += "/dev/xvd" + dn + " "
-	
-print ALLDISKS
 
 if args.configFile:
 	confirm = raw_input("update asmDisks for all nodes in {} \"yes\" to confirm:".format(args.configFile)).lower()
@@ -89,11 +80,59 @@ except Exception as error:
 	print("Failed to load RAC Config from file {} error-> {}".format(conf.getName(), error))
 	exit(1)
 
-conf.save(myConfig)
-
 myConfig["asmDisks"]=asmDisksJson
 
 conf.save(myConfig)
 
+# look for global local disk setting
+localDisks = myConfig.get("localDisks")
+noOfLocalDisks = 0
+if localDisks is None:
+	# get setting from 1st node
+	node1 = myConfig["racnodes"][0]
+	localDisks = node1.get("localDisks")
+	if localDisks is not None:
+		print "Re-calculating ALLDISKS setting - offsetting due to discovery of localDisks"
+		noOfLocalDisks = len(localDisks)
+		print "noOfLocalDisks ", noOfLocalDisks
+
+print "You may want to update ALLDISKS in params.ini to this: "
+
+#  ALLDISKS="ALLDISKS="
+#  # print from /dev/xvdc ... 
+#  for dn in [ chr(i + 98 + noOfLocalDisks) for i in range(1,noOfAsmDisks + 1) ]:
+#  	ALLDISKS += "/dev/xvd" + dn + " "
+#  
+#  print ALLDISKS
+
+
+
+
+ALLDISKS="ALLDISKS="
+'''
+	(1) /dev/xvda - template system disk
+	(2) /dev/xvdb - template system disk
+	(3) -> (3 + noOfLocalDisks) /dev/xvdc -> /dev/xvd? - local disks 
+	(3 + noOfLocalDisks) -> (?) /dev/xvd? -> /dev/xvd? - asm disks
+'''
+diskCount=0
+for i in range( 2 + noOfLocalDisks, 2 + noOfLocalDisks + noOfAsmDisks):
+	# print 'a' => 0    ord('a') => 97
+	# print 'z' => 25   ord('z') => 122
+	diskCount += 1
+	dn=""
+	chrA = ""
+	a = i // 26
+	b = i % 26
+	#print "i={} a={} b={}".format(i,a,b)
+	if a > 0:
+		chrA="{}".format( chr(a + 96) )
+	dn="{}{}".format(  chrA, chr(b + 97) )
+	#print "{}      \"{}\"	".format(diskCount,dn)
+	ALLDISKS += "/dev/xvd" + dn + " "
+
+print ALLDISKS
+
+'''
 
 
