@@ -133,6 +133,5 @@ for i in range( 2 + noOfLocalDisks, 2 + noOfLocalDisks + noOfAsmDisks):
 
 print ALLDISKS
 
-'''
 
 

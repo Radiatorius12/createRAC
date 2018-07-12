@@ -3,7 +3,7 @@
 
 Updates localDisks tuple of the createRACnodes.py config file 
 
-Example:
+Example: 
 
 [automate@lvmjenkinsu createRAC]$ cat defaultLocalDisks
 DBSCRIPTS_DISK,5,Yes,local disk for /dbscripts,null

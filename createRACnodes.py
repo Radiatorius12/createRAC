@@ -8,11 +8,9 @@
 		MUST:
 			-o- IMPORTANT- make sure / update Physical disks => sharable
 				===>>> Started this but commented out as setSharable function fails... need to fix
-			-o- Integrate with Vault for passwords
 			-o- (for use with oracle's deploycluster.py script)
-				Include params.ini (for use with oracle's deploycluster.py script)
 				include updating / preparing a params.ini
-				include -P params.ini in call to deploycluster line
+
 
 		SHOULD:
 			-o- private IPs AND ? OR change NIC setting in template so that the private NIC is local host only
@@ -23,6 +21,21 @@
 			-o- For apply option, check to see if objs exists
 			-o- Change template disk names
 			-o- Add "plan" option - like terraform
+			For plan and discovery functionallity:
+				-o- For Disks
+					+ virtual_disks - add mapping id
+					+ phy disks - add storage element id
+								- add mapping array
+			For apply and plan:
+				-o- For Nodes
+					+ check to see if the object exists
+						use obj in json state file
+						chk to see if name exists
+				-o- For Disks
+					+ check to see if the object exists
+						use obj in json state file
+				-o- For Disk Mapping
+					- 
 
 	Option to have explicit REPO ID for the Virtual disks added.  In the json file it would like this:
 
@@ -246,10 +259,19 @@ def changeVm(s,baseUri,vmId,attribute,value):
 
 	# rename in the json vmObject
 	if attribute == "name":
-		vmObj['id']['name']=value
-		vmObj['name']=value
+		if vmObj['id']['name'] != value and vmObj['name'] != value:
+			vmObj['id']['name']=value
+			vmObj['name']=value
+		else:
+			print "Nothing to change, {} => {} is already set".format(attribute,value)
+			return
+		
 	else:
-		vmObj[attribute]=value
+		if vmObj[attribute] != value:
+			vmObj[attribute]=value
+		else:
+			print "Nothing to change, {} => {} is already set".format(attribute,value)
+			return		
 
 	debug.prt ( "VM block changed to"                                               )
 	debug.prt ( "==============================================================" )
@@ -391,7 +413,9 @@ def createVmDisk(s,baseUri,asmDisk):
 		print "setPhysicalDiskSharable is not working... if shared disks are not sharable you will get an error later...."
 		#setPhysicalDiskSharable(s,baseUri,asmDisk)
 		# NEED TO RETURN STORAGLE ELEMENT HERE ?????
-		return
+		wwid=asmDisk["wwid"]
+		#asmDisk["StorageElement"]=getDiskObjByWwid(s,baseUri,wwid)
+		return getDiskObjByWwid(s,baseUri,wwid)
 
 	# where to create disk:
 	# using myConfig['repositoryIdObj'] is default, but is over-ridded by "repositoryId" in ASM disk definition
@@ -686,6 +710,7 @@ def createNodes(s,baseUri):
 
 		# clone VM
 		racnode['obj']=cloneVm(s, baseUri, myConfig['templateName'], racnode['name'])
+
 		conf.save(myConfig)
 		# update VM if it has nodeConfig
 		if racnode.get("nodeConfig") is not None:
@@ -1104,6 +1129,37 @@ if __name__ == '__main__':
 
 	conf = ""
 	stateFileTest = os.path.splitext(args.configFile)[0] + '.state.json'
+
+	print "\n\n\nWARNING NEW FUNCTIONALLITY TO CHECK THE STATEFILE IS NOT WORKING SO YOU MAY NEED TO DELETE THE STATEFILE YOURSELF\n\n\n"
+	
+	#		if args.destroy:
+	#			if not os.path.isfile(stateFileTest):
+	#				raise Exception("No state file found {} Nothing to destroy".format(stateFileTest))
+	#			else:
+	#				print "Statefile found: {}".format(stateFileTest)
+	#				conf = StateFile(stateFileTest)
+	#		elif os.path.isfile(stateFileTest):
+	#			# chk to see if conf file is newer (has been updated) than statefile
+	#			if os.path.getmtime(stateFileTest) < os.path.getmtime(args.configFile):
+	#				print "\nWARNING:  config file \"{}\" is newer than generated statefile \"{}\"".format(args.configFile, stateFileTest)
+	#				print "\nHave you updated \"{}\" since the last build?".format(args.configFile)
+	#				print "\nEither merge your changes into the statefile or remove the statefile and try again"
+	#				print "Note: if you are dynamically getting IP addesses, these will be lost if, so merge them first if you wan to keep them"
+	#				exit(1)
+	#			print "Found state file {} - using in preference to {}".format(stateFileTest, args.configFile)
+	#			conf = StateFile(stateFileTest)
+	#		else:
+	#			print "No statefile found, creating {}".format(stateFileTest)
+	#			copyfile(args.configFile,stateFileTest)
+	#			conf = StateFile(stateFileTest)
+    #		
+
+	'''
+		OLD STATEFILE LOGIC HERE
+
+	'''
+	conf = ""
+	stateFileTest = os.path.splitext(args.configFile)[0] + '.state.json'
 	if os.path.isfile(stateFileTest):
 		print "Found state file {} - using in preference to {}".format(stateFileTest, args.configFile)
 		conf = StateFile(stateFileTest)
@@ -1113,6 +1169,10 @@ if __name__ == '__main__':
 	else:
 		copyfile(args.configFile,stateFileTest)
 		conf = StateFile(stateFileTest)
+	'''
+		EOD OF OLD STATEFILE LOGIC HERE
+
+	'''
 
 	try:
 		with open(conf.getName(), "r") as f:
@@ -1126,6 +1186,9 @@ if __name__ == '__main__':
 		exit(1)
 
 	conf.save(myConfig)
+
+
+
 
 	'''
 	 ---------------------------------------

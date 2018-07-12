@@ -56,6 +56,8 @@ baseUri="https://{host}:{port}{uri}".format(host=myConfig["ovmHost"],
   
 wwid = args.wwid.replace(':','').lower()
 
+print "Looking for {}....".format(wwid)
+
 r=s.get(baseUri+'/StorageElement').json()
 for disk in r:
 	#thisWwid = re.sub('.* \((\w*)\)', r'\1', disk["name"] , flags = re.IGNORECASE)
