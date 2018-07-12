@@ -1,0 +1,100 @@
+
+{
+  "origin": "[http://10.119.131.44/data/oracle/OVM_OL7U5_X86_64_12102DBRAC_PVHVM-1of2.tar.gz, http://10.119.131.44/data/oracle/OVM_OL7U5_X86_64_12102DBRAC_PVHVM-2of2.tar.gz]",
+  "currentDomainId": -1,
+  "serverId": {
+    "type": "com.oracle.ovm.mgr.ws.model.Server",
+    "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/Server/00:17:a4:77:00:7a:00:17:a4:77:00:7c:00:17:a4:77",
+    "value": "00:17:a4:77:00:7a:00:17:a4:77:00:7c:00:17:a4:77",
+    "name": "ovmnode01u.uat.emiratesnb.com"
+  },
+  "generation": 1,
+  "virtualNicIds": [
+    {
+      "type": "com.oracle.ovm.mgr.ws.model.VirtualNic",
+      "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/VirtualNic/0004fb0000070000d5cf8acec5b351e5",
+      "value": "0004fb0000070000d5cf8acec5b351e5",
+      "name": "00:21:f6:a0:c0:df"
+    },
+    {
+      "type": "com.oracle.ovm.mgr.ws.model.VirtualNic",
+      "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/VirtualNic/0004fb000007000090667b2c4ec3f045",
+      "value": "0004fb000007000090667b2c4ec3f045",
+      "name": "00:21:f6:44:4e:f5"
+    }
+  ],
+  "restartActionOnPowerOff": "STOP",
+  "vmDiskMappingIds": [
+    {
+      "type": "com.oracle.ovm.mgr.ws.model.VmDiskMapping",
+      "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/VmDiskMapping/0004fb0000130000213a42ec49b37a5c",
+      "value": "0004fb0000130000213a42ec49b37a5c",
+      "name": "Mapping for disk Id (0004fb000012000078fbc39e3acb079b.img)"
+    },
+    {
+      "type": "com.oracle.ovm.mgr.ws.model.VmDiskMapping",
+      "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/VmDiskMapping/0004fb0000130000d1a51edfa2506e64",
+      "value": "0004fb0000130000d1a51edfa2506e64",
+      "name": "Mapping for disk Id (0004fb0000120000e7d98134d6438070.img)"
+    }
+  ],
+  "highAvailability": false,
+  "vmDomainType": "XEN_HVM_PV_DRIVERS",
+  "osType": "None",
+  "repositoryId": {
+    "type": "com.oracle.ovm.mgr.ws.model.Repository",
+    "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/Repository/0004fb0000030000f1e379da7990de05",
+    "value": "0004fb0000030000f1e379da7990de05",
+    "name": "OVM_REPO_001"
+  },
+  "cpuCountLimit": 1,
+  "sslTtyPort": null,
+  "currentMemory": 0,
+  "affinityGroupIds": [],
+  "vmStartPolicy": "USE_POOL_POLICY",
+  "id": {
+    "type": "com.oracle.ovm.mgr.ws.model.Vm",
+    "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/Vm/0004fb000006000068146d214110e813",
+    "value": "0004fb000006000068146d214110e813",
+    "name": "racnode.0"
+  },
+  "restartActionOnRestart": "RESTART",
+  "sslVncPort": null,
+  "memory": 3072,
+  "networkInstallPath": "",
+  "cpuUtilizationCap": 100,
+  "kernelVersion": null,
+  "userData": [],
+  "description": "Import URLs: [http://10.119.131.44/data/oracle/OVM_OL7U5_X86_64_12102DBRAC_PVHVM-1of2.tar.gz, http://10.119.131.44/data/oracle/OVM_OL7U5_X86_64_12102DBRAC_PVHVM-2of2.tar.gz]",
+  "restartActionOnCrash": "RESTART",
+  "vmRunState": "STOPPED",
+  "memoryLimit": 3072,
+  "readOnly": false,
+  "guestDriverVersion": null,
+  "vmConfigFileAbsolutePath": "/dev/mapper/3600601600ec036008dd1f3574f48e811/VirtualMachines/0004fb000006000068146d214110e813/vm.cfg",
+  "osVersion": null,
+  "pinnedCpus": null,
+  "cpuPriority": 50,
+  "locked": false,
+  "name": "racnode.0",
+  "vmCloneDefinitionIds": [],
+  "serverPoolId": {
+    "type": "com.oracle.ovm.mgr.ws.model.ServerPool",
+    "uri": "https://10.119.28.31:7002/ovm/core/wsapi/rest/ServerPool/0004fb00000200006d11a095b6f88214",
+    "value": "0004fb00000200006d11a095b6f88214",
+    "name": "OVM-UAT"
+  },
+  "bootOrder": [
+    "DISK"
+  ],
+  "vmApiVersion": null,
+  "vmConfigFileMountedPath": "/OVS/Repositories/0004fb0000030000f1e379da7990de05/VirtualMachines/0004fb000006000068146d214110e813/vm.cfg",
+  "cpuCount": 1,
+  "architecture": null,
+  "vmMouseType": "OS_DEFAULT",
+  "resourceGroupIds": [],
+  "hugePagesEnabled": false,
+  "diskLimit": 107,
+  "keymapName": "en-us",
+  "currentCpuCount": 0
+}
