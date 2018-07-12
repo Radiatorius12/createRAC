@@ -1,11 +1,6 @@
 ASM_recomendations.txt
 IpAddresses.json
-ORCL.log
 Vm.json
-asmca-180624AM105715.log
-asmca-180624AM111419.log
-asmca-180627AM015352.log
-buildcluster.log
 createRAC.zip
 createRAC/
 createRACnodes.10Jun18.py
@@ -42,5 +37,11 @@ racConfVirtDisk_ENBD_Std.state.json
 racConfVirtualDisk.EXAMPLE.json
 racConfVirtualDisk.json
 racConfVirtualDisk.json.24may18
-test.log
+*.log
 utils/
+CalypsoProd/
+FinacleSG_UAT1/
+FinacleSG_UAT2/
+trace.log_OraRAC12c_2018-06-24_11-18-21-AM
+xxx.py
+createRACnodes2Jul18.py
